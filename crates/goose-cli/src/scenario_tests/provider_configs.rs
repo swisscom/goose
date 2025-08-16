@@ -94,6 +94,13 @@ static PROVIDER_CONFIGS: LazyLock<Vec<ProviderConfig>> = LazyLock::new(|| {
             Some("No keys available"),
         ),
         ProviderConfig::simple_skip("snowflake", "claude-3-7-sonnet", Some("No keys available")),
+        ProviderConfig {
+            name: "swiss_ai_platform",
+            model_name: "meta/llama-3.3-70b-instruct",
+            required_env_vars: &["SWISS_AI_PLATFORM_API_KEY"],
+            env_modifications: None,
+            skip_reason: Some("No keys available"),
+        },
         ProviderConfig::simple_skip("venice", "llama-3.3-70b", Some("No keys available")),
         ProviderConfig::simple_skip("xai", "grok-3", Some("No keys available")),
     ]

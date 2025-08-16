@@ -5,7 +5,7 @@ use goose::providers::base::Provider;
 use goose::providers::errors::ProviderError;
 use goose::providers::{
     anthropic, azure, bedrock, databricks, google, groq, litellm, ollama, openai, openrouter,
-    snowflake, xai,
+    snowflake, swiss_ai_platform, xai,
 };
 use rmcp::model::Tool;
 use rmcp::model::{AnnotateAble, Content, RawImageContent};
@@ -622,6 +622,17 @@ async fn test_litellm_provider() -> Result<()> {
 #[tokio::test]
 async fn test_xai_provider() -> Result<()> {
     test_provider("Xai", &["XAI_API_KEY"], None, xai::XaiProvider::default).await
+}
+
+#[tokio::test]
+async fn test_swiss_ai_platform_provider() -> Result<()> {
+    test_provider(
+        "Swiss AI Platform",
+        &["SWISS_AI_PLATFORM_API_KEY"],
+        None,
+        swiss_ai_platform::SwissAiPlatformProvider::default,
+    )
+    .await
 }
 
 // Print the final test report

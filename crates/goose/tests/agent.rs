@@ -13,7 +13,7 @@ use goose::providers::{
     anthropic::AnthropicProvider, azure::AzureProvider, bedrock::BedrockProvider,
     databricks::DatabricksProvider, gcpvertexai::GcpVertexAIProvider, google::GoogleProvider,
     groq::GroqProvider, ollama::OllamaProvider, openai::OpenAiProvider,
-    openrouter::OpenRouterProvider, xai::XaiProvider,
+    openrouter::OpenRouterProvider, swiss_ai_platform::SwissAiPlatformProvider, xai::XaiProvider,
 };
 
 #[derive(Debug, PartialEq)]
@@ -28,6 +28,7 @@ enum ProviderType {
     Groq,
     Ollama,
     OpenRouter,
+    SwissAiPlatform,
     Xai,
 }
 
@@ -48,6 +49,7 @@ impl ProviderType {
             ProviderType::Ollama => &[],
             ProviderType::OpenRouter => &["OPENROUTER_API_KEY"],
             ProviderType::GcpVertexAI => &["GCP_PROJECT_ID", "GCP_LOCATION"],
+            ProviderType::SwissAiPlatform => &["SWISS_AI_PLATFORM_API_KEY"],
             ProviderType::Xai => &["XAI_API_KEY"],
         }
     }
@@ -82,6 +84,7 @@ impl ProviderType {
             ProviderType::Groq => Arc::new(GroqProvider::from_env(model_config)?),
             ProviderType::Ollama => Arc::new(OllamaProvider::from_env(model_config)?),
             ProviderType::OpenRouter => Arc::new(OpenRouterProvider::from_env(model_config)?),
+            ProviderType::SwissAiPlatform => Arc::new(SwissAiPlatformProvider::from_env(model_config)?),
             ProviderType::Xai => Arc::new(XaiProvider::from_env(model_config)?),
         })
     }
@@ -350,6 +353,16 @@ mod tests {
             provider_type: ProviderType::Xai,
             model: "grok-3",
             context_window: 9_000,
+        })
+        .await
+    }
+
+    #[tokio::test]
+    async fn test_agent_with_swiss_ai_platform() -> Result<()> {
+        run_test_with_config(TestConfig {
+            provider_type: ProviderType::SwissAiPlatform,
+            model: "meta/llama-3.3-70b-instruct",
+            context_window: 128_000,
         })
         .await
     }

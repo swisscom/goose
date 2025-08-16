@@ -305,7 +305,26 @@ pub async fn initialize_pricing_cache() -> Result<()> {
 
 /// Get pricing for a specific model
 pub async fn get_model_pricing(provider: &str, model: &str) -> Option<PricingInfo> {
-    PRICING_CACHE.get_model_pricing(provider, model).await
+    // First try the cache (OpenRouter data)
+    if let Some(pricing) = PRICING_CACHE.get_model_pricing(provider, model).await {
+        return Some(pricing);
+    }
+
+    // Fallback to static pricing for providers not in OpenRouter
+    get_static_pricing(provider, model)
+}
+
+/// Get static pricing for providers not available through OpenRouter
+fn get_static_pricing(provider: &str, _model: &str) -> Option<PricingInfo> {
+    match provider.to_lowercase().as_str() {
+        "swiss_ai_platform" => {
+            // Swiss AI Platform pricing according to current price list applies
+            // Pricing data not integrated into cost tracking system
+            // Contact Swisscom for current pricing information
+            None
+        }
+        _ => None,
+    }
 }
 
 /// Force refresh pricing data
@@ -352,6 +371,8 @@ pub fn parse_model_id(model_id: &str) -> Option<(String, String)> {
             "microsoft" => "azure",
             "replicate" => "replicate",
             "huggingface" => "huggingface",
+            "swisscom" => "swiss_ai_platform",
+            "swiss-ai-platform" => "swiss_ai_platform",
             _ => parts[0],
         };
         Some((provider.to_string(), parts[1].to_string()))
@@ -394,6 +415,22 @@ mod tests {
         assert_eq!(convert_pricing("0.000003"), Some(0.000003));
         assert_eq!(convert_pricing("0.015"), Some(0.015));
         assert_eq!(convert_pricing("invalid"), None);
+    }
+
+    #[tokio::test]
+    async fn test_swiss_ai_platform_pricing() {
+        // Test Swiss AI Platform pricing lookup
+        // Should return None since pricing is not publicly available
+        let llama_pricing = get_model_pricing("swiss_ai_platform", "meta/llama-3.3-70b-instruct").await;
+        assert!(llama_pricing.is_none(), "Swiss AI Platform pricing should not be available");
+        
+        // Test Nemotron model
+        let nemotron_pricing = get_model_pricing("swiss_ai_platform", "nvidia/llama-3.3-nemotron-super-49b-v1").await;
+        assert!(nemotron_pricing.is_none(), "Swiss AI Platform pricing should not be available");
+        
+        // Test unknown model
+        let unknown_pricing = get_model_pricing("swiss_ai_platform", "unknown-model").await;
+        assert!(unknown_pricing.is_none());
     }
 
     #[tokio::test]

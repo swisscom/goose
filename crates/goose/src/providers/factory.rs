@@ -18,6 +18,7 @@ use super::{
     openrouter::OpenRouterProvider,
     sagemaker_tgi::SageMakerTgiProvider,
     snowflake::SnowflakeProvider,
+    swiss_ai_platform::SwissAiPlatformProvider,
     venice::VeniceProvider,
     xai::XaiProvider,
 };
@@ -56,8 +57,9 @@ pub fn providers() -> Vec<ProviderMetadata> {
         OpenAiProvider::metadata(),
         OpenRouterProvider::metadata(),
         SageMakerTgiProvider::metadata(),
-        VeniceProvider::metadata(),
         SnowflakeProvider::metadata(),
+        SwissAiPlatformProvider::metadata(),
+        VeniceProvider::metadata(),
         XaiProvider::metadata(),
     ]
 }
@@ -165,6 +167,7 @@ fn create_provider(name: &str, model: ModelConfig) -> Result<Arc<dyn Provider>> 
         "openrouter" => Ok(Arc::new(OpenRouterProvider::from_env(model)?)),
         "sagemaker_tgi" => Ok(Arc::new(SageMakerTgiProvider::from_env(model)?)),
         "snowflake" => Ok(Arc::new(SnowflakeProvider::from_env(model)?)),
+        "swiss_ai_platform" => Ok(Arc::new(SwissAiPlatformProvider::from_env(model)?)),
         "venice" => Ok(Arc::new(VeniceProvider::from_env(model)?)),
         "xai" => Ok(Arc::new(XaiProvider::from_env(model)?)),
         _ => Err(anyhow::anyhow!("Unknown provider: {}", name)),
@@ -382,6 +385,35 @@ mod tests {
         }
         if let Some(val) = saved_fallback {
             env::set_var("GOOSE_LEAD_FALLBACK_TURNS", val);
+        }
+    }
+
+    #[test]
+    fn test_swiss_ai_platform_provider_in_factory() {
+        // Test that swiss_ai_platform provider is included in providers list
+        let providers = providers();
+        let swiss_provider = providers.iter().find(|p| p.name == "swiss_ai_platform");
+        assert!(swiss_provider.is_some(), "Swiss AI Platform provider should be in providers list");
+        
+        let swiss_metadata = swiss_provider.unwrap();
+        assert_eq!(swiss_metadata.display_name, "Swiss AI Platform");
+        assert_eq!(swiss_metadata.default_model, "meta/llama-3.3-70b-instruct");
+        
+        // Test that create_provider can handle swiss_ai_platform
+        let model_config = ModelConfig::new_or_fail("meta/llama-3.3-70b-instruct");
+        let result = create_provider("swiss_ai_platform", model_config);
+        
+        // Should fail due to missing API key, but not due to unknown provider
+        match result {
+            Ok(_) => {
+                // Success means API keys are available
+            }
+            Err(error) => {
+                let error_msg = error.to_string();
+                // Should fail due to missing API key, not unknown provider
+                assert!(error_msg.contains("SWISS_AI_PLATFORM_API_KEY") || error_msg.contains("secret"));
+                assert!(!error_msg.contains("Unknown provider"));
+            }
         }
     }
 

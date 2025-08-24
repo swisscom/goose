@@ -17,12 +17,14 @@ pub const SWISS_AI_PLATFORM_DEFAULT_MODEL: &str = "meta/llama-3.3-70b-instruct";
 pub const SWISS_AI_PLATFORM_KNOWN_MODELS: &[&str] = &[
     "meta/llama-3.3-70b-instruct",
     "nvidia/llama-3.3-nemotron-super-49b-v1",
+    "meta/llama-4-scout-17b-16e-instruct",
 ];
 pub const SWISS_AI_PLATFORM_DOC_URL: &str = "https://api.swisscom.com/layer/swiss-ai-platform";
 
 // Base URLs for different models
 const LLAMA_3_3_70B_BASE_URL: &str = "https://api.swisscom.com/layer/swiss-ai-platform/llama-3-3-70b/v1/";
 const LLAMA_3_3_NEMOTRON_BASE_URL: &str = "https://api.swisscom.com/layer/swiss-ai-platform/llama-3.3-nemotron-super-49b/v1/";
+const LLAMA_4_SCOUT_BASE_URL: &str = "https://api.swisscom.com/layer/swiss-ai-platform/llama-4-scout-17b-16e/v1/";
 
 /// URL mapping function for different models
 /// Returns the appropriate base URL based on the model name
@@ -30,6 +32,7 @@ fn get_base_url_for_model(model_name: &str) -> &'static str {
     match model_name {
         "meta/llama-3.3-70b-instruct" => LLAMA_3_3_70B_BASE_URL,
         "nvidia/llama-3.3-nemotron-super-49b-v1" => LLAMA_3_3_NEMOTRON_BASE_URL,
+        "meta/llama-4-scout-17b-16e-instruct" => LLAMA_4_SCOUT_BASE_URL,
         _ => LLAMA_3_3_70B_BASE_URL, // Default fallback to Llama 3.3 70B
     }
 }
@@ -173,8 +176,8 @@ impl Provider for SwissAiPlatformProvider {
             SWISS_AI_PLATFORM_KNOWN_MODELS.to_vec(),
             SWISS_AI_PLATFORM_DOC_URL,
             vec![
+                ConfigKey::new("SWISS_AI_PLATFORM_HOST", true, false, Some("https://api.swisscom.com/layer/swiss-ai-platform/llama-3-3-70b/v1/")),
                 ConfigKey::new("SWISS_AI_PLATFORM_API_KEY", true, true, None),
-                ConfigKey::new("SWISS_AI_PLATFORM_HOST", false, false, None),
             ],
         )
     }
@@ -200,19 +203,60 @@ impl Provider for SwissAiPlatformProvider {
             ));
         }
 
-        let payload = create_request(
-            &self.model,
-            system,
-            messages,
-            tools,
-            &super::utils::ImageFormat::OpenAi,
-        ).map_err(|e| {
-            tracing::error!("Failed to create request payload for Swiss AI Platform: {}", e);
-            ProviderError::UsageError(format!(
-                "Failed to create request for Swiss AI Platform: {}. \
-                Please check your input parameters.", e
-            ))
-        })?;
+        // Apply model-specific modifications to system prompt and temperature
+        let (_modified_system, payload) = if self.model.model_name.contains("nemotron") {
+            // For Nemotron models, add "detailed thinking off" and set temperature=0
+            let modified_system = if system.is_empty() {
+                "detailed thinking off".to_string()
+            } else {
+                format!("{} detailed thinking off", system)
+            };
+            
+            let mut payload = create_request(
+                &self.model,
+                &modified_system,
+                messages,
+                tools,
+                &super::utils::ImageFormat::OpenAi,
+            ).map_err(|e| {
+                tracing::error!("Failed to create request payload for Swiss AI Platform: {}", e);
+                ProviderError::UsageError(format!(
+                    "Failed to create request for Swiss AI Platform: {}. \
+                    Please check your input parameters.", e
+                ))
+            })?;
+            
+            // Set temperature to 0 for Nemotron
+            if let Some(obj) = payload.as_object_mut() {
+                obj.insert("temperature".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(0.0).unwrap()));
+            }
+            
+            (modified_system, payload)
+        } else {
+            // For other models, use standard request creation
+            let payload = create_request(
+                &self.model,
+                system,
+                messages,
+                tools,
+                &super::utils::ImageFormat::OpenAi,
+            ).map_err(|e| {
+                tracing::error!("Failed to create request payload for Swiss AI Platform: {}", e);
+                ProviderError::UsageError(format!(
+                    "Failed to create request for Swiss AI Platform: {}. \
+                    Please check your input parameters.", e
+                ))
+            })?;
+            
+            (system.to_string(), payload)
+        };
+        
+        tracing::debug!(
+            "Swiss AI Platform request for model '{}': system_prompt_modified={}, temperature_override={}",
+            self.model.model_name,
+            self.model.model_name.contains("nemotron"),
+            if self.model.model_name.contains("nemotron") { "0.0" } else { "default" }
+        );
 
         let response = self.with_retry(|| self.post(payload.clone())).await
             .map_err(|e| {
@@ -477,5 +521,55 @@ mod tests {
         unique_models.sort();
         unique_models.dedup();
         assert_eq!(unique_models.len(), SWISS_AI_PLATFORM_KNOWN_MODELS.len());
+    }
+
+    #[test]
+    fn test_nemotron_model_detection() {
+        // Test that nemotron models are correctly identified
+        let nemotron_models = vec![
+            "nvidia/llama-3.3-nemotron-super-49b-v1",
+            "nvidia/llama-3.3-nemotron-70b-instruct",
+            "some-nemotron-variant",
+        ];
+        
+        for model_name in nemotron_models {
+            assert!(model_name.contains("nemotron"), "Model '{}' should be detected as nemotron", model_name);
+        }
+        
+        // Test non-nemotron models
+        let non_nemotron_models = vec![
+            "meta/llama-3.3-70b-instruct",
+            "meta/llama-4-scout-17b-16e-instruct", 
+            "gpt-4o",
+        ];
+        
+        for model_name in non_nemotron_models {
+            assert!(!model_name.contains("nemotron"), "Model '{}' should NOT be detected as nemotron", model_name);
+        }
+    }
+
+    #[test] 
+    fn test_system_prompt_modification_logic() {
+        // Test the logic for system prompt modification
+        
+        // Test empty system prompt
+        let empty_system = "";
+        let expected_with_detailed_thinking = "detailed thinking off";
+        let result = if empty_system.is_empty() {
+            "detailed thinking off".to_string()
+        } else {
+            format!("{} detailed thinking off", empty_system)
+        };
+        assert_eq!(result, expected_with_detailed_thinking);
+        
+        // Test non-empty system prompt
+        let system_prompt = "You are a helpful assistant.";
+        let expected_with_system = "You are a helpful assistant. detailed thinking off";
+        let result = if system_prompt.is_empty() {
+            "detailed thinking off".to_string()
+        } else {
+            format!("{} detailed thinking off", system_prompt)
+        };
+        assert_eq!(result, expected_with_system);
     }
 }

@@ -40,6 +40,7 @@ pub mod provider_test;
 mod retry;
 pub mod sagemaker_tgi;
 pub mod snowflake;
+pub mod swiss_ai_platform;
 pub mod testprovider;
 pub mod tetrate;
 pub mod toolshim;

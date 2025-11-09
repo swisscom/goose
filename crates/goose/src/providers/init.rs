@@ -28,6 +28,7 @@ use super::{
     provider_registry::ProviderRegistry,
     sagemaker_tgi::SageMakerTgiProvider,
     snowflake::SnowflakeProvider,
+    swiss_ai_platform::SwissAiPlatformProvider,
     tetrate::TetrateProvider,
     venice::VeniceProvider,
     xai::XaiProvider,

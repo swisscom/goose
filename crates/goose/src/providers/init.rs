@@ -72,6 +72,7 @@ async fn init_registry() -> RwLock<ProviderRegistry> {
         registry.register::<OpenRouterProvider>(true);
         registry.register::<SageMakerTgiProvider>(false);
         registry.register::<SnowflakeProvider>(false);
+        registry.register::<SwissAiPlatformProvider>(false);
         registry.register::<TetrateProvider>(true);
         registry.register::<VeniceProvider>(false);
         registry.register::<XaiProvider>(false);

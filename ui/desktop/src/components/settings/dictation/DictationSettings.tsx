@@ -109,9 +109,12 @@ export const DictationSettings = () => {
     setIsEditingKey(false);
   };
 
-  const getProviderLabel = (p: DictationProvider | null): string => {
-    if (!p) return 'Disabled';
-    return p.charAt(0).toUpperCase() + p.slice(1);
+  const getProviderLabel = (provider: DictationProvider | null): string => {
+    if (!provider) return 'Disabled';
+    return provider
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
   };
 
   const visibleProviders = (Object.keys(providerStatuses) as DictationProvider[]).filter(

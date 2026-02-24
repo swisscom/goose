@@ -25,6 +25,8 @@ pub enum DictationProvider {
     OpenAI,
     ElevenLabs,
     Groq,
+    #[serde(rename = "swiss_ai_platform")]
+    SwissAiPlatform,
     #[cfg(feature = "local-inference")]
     Local,
 }
@@ -68,6 +70,16 @@ pub const PROVIDERS: &[DictationProviderDef] = &[
         endpoint_path: "v1/speech-to-text",
         host_key: None,
         description: "Uses ElevenLabs speech-to-text API for advanced voice processing.",
+        uses_provider_config: false,
+        settings_path: None,
+    },
+    DictationProviderDef {
+        provider: DictationProvider::SwissAiPlatform,
+        config_key: "SWISS_AI_PLATFORM_WHISPER_API_KEY",
+        default_base_url: "https://api.swisscom.com/layer/swiss-ai-platform/whisper",
+        endpoint_path: "v1/audio/transcriptions",
+        host_key: Some("SWISS_AI_PLATFORM_WHISPER_HOST"),
+        description: "Uses Swiss AI Platform Whisper for speech-to-text transcription.",
         uses_provider_config: false,
         settings_path: None,
     },
@@ -201,6 +213,7 @@ fn build_api_client(provider: DictationProvider) -> Result<ApiClient> {
     let auth = match provider {
         DictationProvider::OpenAI => AuthMethod::BearerToken(api_key),
         DictationProvider::Groq => AuthMethod::BearerToken(api_key),
+        DictationProvider::SwissAiPlatform => AuthMethod::BearerToken(api_key),
         DictationProvider::ElevenLabs => AuthMethod::ApiKey {
             header_name: "xi-api-key".to_string(),
             key: api_key,

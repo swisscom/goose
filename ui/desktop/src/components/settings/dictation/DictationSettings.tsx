@@ -176,7 +176,10 @@ export const DictationSettings = () => {
 
   const getProviderLabel = (p: DictationProvider | null): string => {
     if (!p) return intl.formatMessage(i18n.disabled);
-    return p.charAt(0).toUpperCase() + p.slice(1);
+    return p
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
   };
 
   const visibleProviders = (Object.keys(providerStatuses) as DictationProvider[]).filter(
